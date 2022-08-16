@@ -22,6 +22,10 @@ export default defineComponent({
     onReady(){
       console.log("onReady")
     },
+    onSubmit(data){
+      console.log("onSubmit")
+      console.log(data)
+    },
     onClose(){
       console.log("onClose")
     }
@@ -35,11 +39,12 @@ export default defineComponent({
 <template>
   <div id="app">
     <CSVBoxButton 
-      licenseKey="aZ37XCq5U6FiZUtP3BOYoCzDyQkzT0" 
+      licenseKey="Sheet License Key" 
       :user="{ user_id: 'default123' }" 
       :onImport="onImport"
       :onReady="onReady"
       :onClose="onClose"
+      :onSubmit="onSubmit"
       >Import</CSVBoxButton>
   </div>
 </template>

@@ -25,6 +25,10 @@ export default /*#__PURE__*/defineComponent({
         type: Function,
         default: function() {}
     },
+    onSubmit: {
+        type: Function,
+        default: function() {}
+    },
     onClose:{
         type: Function,
         default: function() {}
@@ -50,7 +54,8 @@ export default /*#__PURE__*/defineComponent({
   },
   computed:{
       iframeSrc() {
-          let BASE_URL = `https://${this.useStagingServer ? 'staging' : 'app' }.csvbox.io/embed/${this.licenseKey}`;
+        //   let BASE_URL = `https://${this.useStagingServer ? 'staging' : 'app' }.csvbox.io/embed/${this.licenseKey}`;
+          let BASE_URL = `https://stagingishwar.csvbox.io/embed/${this.licenseKey}`;
           return `${BASE_URL}?library-version=2&source=embedCode&sourceLang=vue`;
       }
   },
@@ -83,12 +88,57 @@ export default /*#__PURE__*/defineComponent({
           }
           if(typeof event.data == "object") {
               if(event?.data?.data?.unique_token == this.uuid) {
-                  if(event.data.type && event.data.type == "data-push-status") {
+                if(event.data.type && event.data.type == "data-on-submit") {
+                    let metadata = event.data.data;
+                    metadata["column_mappings"] = event.data.column_mapping;
+                    // this.callback(true, metadata);
+                    delete metadata["unique_token"];
+                    this.onSubmit?.(metadata);
+                }
+                else if(event.data.type && event.data.type == "data-push-status") {
                       if(event.data.data.import_status == "success") {
-                          this.onImport(true, event.data.data);
-                      } else {
-                          this.onImport(false, event.data.data);
-                      }
+                        if(event && event.data && event.data.row_data) {
+                            let primary_row_data = event.data.row_data;
+                            let headers = event.data.headers;
+                            let rows = [];
+                            let dynamic_columns_indexes = event.data.dynamicColumnsIndexes;
+                            let dropdown_display_labels_mappings = event.data.dropdown_display_labels_mappings;
+                            primary_row_data.forEach((row_data) => {
+                                let x = {};
+                                let dynamic_columns = {};
+                                row_data.data.forEach((col, i)=>{
+                                    if(col == undefined){ col = "" };
+                                    if(!!dropdown_display_labels_mappings[i] && !!dropdown_display_labels_mappings[i][col]) {
+                                        col = dropdown_display_labels_mappings[i][col];
+                                    }
+                                    if(dynamic_columns_indexes.includes(i)) {
+                                        dynamic_columns[headers[i]] = col;
+                                    }else{
+                                        x[headers[i]] = col;
+                                    }
+                                });
+                                if(row_data?.unmapped_data) {
+                                    x["_unmapped_data"] = row_data.unmapped_data;
+                                }
+                                if(dynamic_columns && Object.keys(dynamic_columns).length > 0) {
+                                    x["_dynamic_data"] = dynamic_columns;
+                                }
+                                rows.push(x);
+                            });
+                            let metadata = event.data.data;
+                            metadata["rows"] = rows;
+                            delete metadata["unique_token"];
+                            this.onImport(true, metadata);
+                        }else{
+                            let metadata = event.data.data;
+                            delete metadata["unique_token"];
+                            this.onImport(true, metadata);
+                        }
+
+                    } else {
+                        console.log("onImport", false, event.data.data);
+                        this.onImport(false, event.data.data);
+                    }
                   }
               }
           }
