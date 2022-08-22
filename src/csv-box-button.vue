@@ -54,8 +54,7 @@ export default /*#__PURE__*/defineComponent({
   },
   computed:{
       iframeSrc() {
-        //   let BASE_URL = `https://${this.useStagingServer ? 'staging' : 'app' }.csvbox.io/embed/${this.licenseKey}`;
-          let BASE_URL = `https://stagingishwar.csvbox.io/embed/${this.licenseKey}`;
+          let BASE_URL = `https://${this.useStagingServer ? 'staging' : 'app' }.csvbox.io/embed/${this.licenseKey}`;
           return `${BASE_URL}?library-version=2&source=embedCode&sourceLang=vue`;
       }
   },

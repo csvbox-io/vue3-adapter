@@ -1,6 +1,6 @@
 {
   "name": "@csvbox/vuejs3",
-  "version": "1.0.2",
+  "version": "1.0.4",
   "description": "Vue adapter (Vue Version 3) for csvbox.io",
   "author": "csvbox-io",
   "license": "MIT",
