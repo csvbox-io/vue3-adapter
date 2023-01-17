@@ -1,6 +1,7 @@
 <script>
 import { defineComponent } from 'vue';
 import { isProxy, toRaw } from 'vue';
+const packageJson = require("./../package.json")
 
 export default /*#__PURE__*/defineComponent({
   name: 'CSVBoxButton', // vue component name
@@ -8,14 +9,6 @@ export default /*#__PURE__*/defineComponent({
     licenseKey: {
         type: String,
         required: true
-    },
-    debugMode: {
-        type: Boolean,
-        required: false
-    },
-    useStagingServer: {
-        type: Boolean,
-        required: false
     },
     onImport: {
         type: Function,
@@ -50,52 +43,82 @@ export default /*#__PURE__*/defineComponent({
         default: function () {
             return { user_id: 'default123' };
         }
+    },
+    dataLocation: {
+        type: String,
+        required: false
+    },
+    customDomain: {
+        type: String,
+        required: false
+    },
+    language: {
+        type: String,
+        required: false
+    },
+    lazy: {
+        type: Boolean,
+        required: false,
+        default: false
     }
   },
-  computed:{
-      iframeSrc() {
-          let BASE_URL = `https://${this.useStagingServer ? 'staging' : 'app' }.csvbox.io/embed/${this.licenseKey}`;
-          return `${BASE_URL}?library-version=2&source=embedCode&sourceLang=vue`;
-      }
-  },
-  data(){
-      return {
-          isModalShown: false,
-          disableImportButton: true,
-          uuid: Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15)
-      }
-  },
+  computed: {
+        iframeSrc() {
+            let domain = this.customDomain ? this.customDomain : "app.csvbox.io";
+            if(this.dataLocation) { domain = `${this.dataLocation}-${domain}`; }
+            let iframeUrl = `https://${domain}/embed/${this.licenseKey}`;
+            iframeUrl += `?library-version=${packageJson.version}`;
+            iframeUrl += "&framework=vue3";
+            if(this.dataLocation) {
+                iframeUrl += "&preventRedirect";
+            }
+            if(this.language) {
+                iframeUrl += "&language=" + this.language;
+            }
+            return iframeUrl;
+        }
+    },
+    data(){
+        return {
+            isModalShown: false,
+            disableImportButton: true,
+            uuid: Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15),
+            iframe: null,
+            isIframeLoaded: false,
+            openModalOnIframeLoad: false,
+        }
+    },
   methods: {
-      openModal() {
-          if(!this.isModalShown) {
-              this.isModalShown = true;
-              this.$refs.holder.style.display = 'block';
-              this.$refs.iframe.contentWindow.postMessage('openModal', '*');
-          }
-      },
+        openModal() {
+            if(this.lazy) {
+                if(!this.iframe) {
+                    this.openModalOnIframeLoad = true;
+                    this.initImporter();
+                    return;
+                }
+            }
+            if(!this.isModalShown) {
+                if(this.isIframeLoaded) {
+                    this.isModalShown = true;
+                    this.$refs.holder.style.display = 'block';
+                    this.iframe.contentWindow.postMessage('openModal', '*');
+                } else {
+                    this.openModalOnIframeLoad = true;
+                }                    
+            }
+        },
       onMessageEvent(event) {
-          if (event.data === "mainModalHidden") {
-              this.$refs.holder.style.display = 'none';
-              this.isModalShown = false;
-              this.onClose();
-          }
-          if(event.data === "uploadSuccessful") {
-              this.onImport(true);
-          }
-          if(event.data === "uploadFailed") {
-              this.onImport(false);
-          }
-          if(typeof event.data == "object") {
-              if(event?.data?.data?.unique_token == this.uuid) {
+
+        if(typeof event.data == "object") {
+            if(event?.data?.data?.unique_token == this.uuid) {
                 if(event.data.type && event.data.type == "data-on-submit") {
                     let metadata = event.data.data;
                     metadata["column_mappings"] = event.data.column_mapping;
-                    // this.callback(true, metadata);
                     delete metadata["unique_token"];
                     this.onSubmit?.(metadata);
                 }
                 else if(event.data.type && event.data.type == "data-push-status") {
-                      if(event.data.data.import_status == "success") {
+                    if(event.data.data.import_status == "success") {
                         if(event && event.data && event.data.row_data) {
                             let primary_row_data = event.data.row_data;
                             let headers = event.data.headers;
@@ -141,49 +164,84 @@ export default /*#__PURE__*/defineComponent({
                             let metadata = event.data.data;
                             delete metadata["unique_token"];
                             this.onImport(true, metadata);
-                        }
+                            }
 
-                    } else {
-                        console.log("onImport", false, event.data.data);
-                        this.onImport(false, event.data.data);
+                        } else {
+                            console.log("onImport", false, event.data.data);
+                            this.onImport(false, event.data.data);
+                        }
+                    } else if(event.data.type && event.data.type == "csvbox-modal-hidden") {
+                        this.$refs.holder.style.display = 'none';
+                        this.isModalShown = false;
+                        this.onClose();
+                    } else if(event.data.type && event.data.type == "csvbox-upload-successful") {
+                        this.onImport(true);
+                    } else if(event.data.type && event.data.type == "csvbox-upload-failed") {
+                        this.onImport(false);
                     }
-                  }
-              }
-          }
-      },
-      randomString() {
-          let result = '';
-          let characters = 'abcdefghijklmnopqrstuvwxyz0123456789';
-          let charactersLength = characters.length;
-          for (let i = 0; i < 20; i++) {
-              result += characters.charAt(Math.floor(Math.random() * charactersLength)); 
-          }
-          return result;
-      }
+                }
+            }
+        },
+        randomString() {
+            let result = '';
+            let characters = 'abcdefghijklmnopqrstuvwxyz0123456789';
+            let charactersLength = characters.length;
+            for (let i = 0; i < 20; i++) {
+                result += characters.charAt(Math.floor(Math.random() * charactersLength)); 
+            }
+            return result;
+        },
+        initImporter() {
+
+            let iframe = document.createElement("iframe");
+            this.iframe = iframe;
+            iframe.setAttribute("src", this.iframeSrc);
+            iframe.frameBorder = 0;
+            iframe.classList.add('csvbox-iframe');
+
+            window.addEventListener("message", this.onMessageEvent, false);
+
+            let self = this;
+
+            iframe.onload = function () {
+                self.isIframeLoaded = true;
+                iframe.contentWindow.postMessage({
+                    "customer" : self.user ? (isProxy(self.user) ? toRaw(self.user) : self.user) : null,
+                    "columns" : self.dynamicColumns ? (isProxy(self.dynamicColumns) ? toRaw(self.dynamicColumns) : self.dynamicColumns) : null,
+                    "options" : self.options ? (isProxy(self.options) ? toRaw(self.options) : self.options) : null,
+                    "unique_token": self.uuid
+                }, "*");
+                self.disableImportButton = false;
+                self.onReady();
+                if(self.openModalOnIframeLoad) {
+                    self.openModal();
+                }
+            }
+
+            this.$refs.holder.appendChild(iframe);
+
+        }
   },
   mounted() {
 
-      window.addEventListener("message", this.onMessageEvent, false);
+        // window.addEventListener("message", this.onMessageEvent, false);
+        // let iframe = this.$refs.iframe;
+        // let self = this;
+        // iframe.onload = function () {
+        //     iframe.contentWindow.postMessage({
+                
+        //     }, "*");
+        //     self.disableImportButton = false;
+        //     self.onReady();
+        // }
 
-      let iframe = this.$refs.iframe;
+        if(this.lazy) {
+            this.disableImportButton = false;
+        } else {
+            this.initImporter();
+        }
 
-      let self = this;
-
-      iframe.onload = function () {
-
-        iframe.contentWindow.postMessage({
-            "customer" : self.user ? (isProxy(self.user) ? toRaw(self.user) : self.user) : null,
-            "columns" : self.dynamicColumns ? (isProxy(self.dynamicColumns) ? toRaw(self.dynamicColumns) : self.dynamicColumns) : null,
-            "options" : self.options ? (isProxy(self.options) ? toRaw(self.options) : self.options) : null,
-            "unique_token": self.uuid
-        }, "*");
-
-          self.disableImportButton = false;
-
-          self.onReady();
-
-      }
-  },
+    },
   beforeDestroy() {
       window.removeEventListener("message", this.onMessageEvent);
   }
@@ -196,7 +254,7 @@ export default /*#__PURE__*/defineComponent({
             <slot></slot>
         </button>
         <div ref="holder" class="holder-style">
-            <iframe ref="iframe" class="iframe" :src="iframeSrc" frameBorder="0"></iframe>
+            <!-- <iframe ref="iframe" class="iframe" :src="iframeSrc" frameBorder="0"></iframe> -->
         </div>
     </div>
 </template>
@@ -211,11 +269,13 @@ export default /*#__PURE__*/defineComponent({
         left: 0;
         right: 0;
     }
-    .iframe {
-        height: 100%;
-        width: 100%;
-        position: absolute;
-        top: 0;
-        left: 0;
-    }
+</style>
+<style>
+.csvbox-iframe {
+    height: 100%;
+    width: 100%;
+    position: absolute;
+    top: 0;
+    left: 0;
+}
 </style>
