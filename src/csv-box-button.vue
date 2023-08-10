@@ -60,6 +60,10 @@ export default /*#__PURE__*/defineComponent({
         type: Boolean,
         required: false,
         default: false
+    },
+    loadStarted: {
+        type: Function,
+        default: function() {}
     }
   },
   computed: {
@@ -192,6 +196,8 @@ export default /*#__PURE__*/defineComponent({
             return result;
         },
         initImporter() {
+
+            this.loadStarted();
 
             let iframe = document.createElement("iframe");
             this.iframe = iframe;
