@@ -64,7 +64,13 @@ export default /*#__PURE__*/defineComponent({
     loadStarted: {
         type: Function,
         default: function() {}
-    }
+    },
+    environment: {
+        type: Object,
+        default: function () {
+            return null;
+        }
+    },
   },
   computed: {
         iframeSrc() {
@@ -78,6 +84,12 @@ export default /*#__PURE__*/defineComponent({
             }
             if(this.language) {
                 iframeUrl += "&language=" + this.language;
+            }
+            if(this.environment) {
+                let environment = JSON.stringify(this.environment).replace(/['"]/g, function(match) {
+                    return '\\' + match;
+                });
+                iframeUrl += `&env=${environment}`;
             }
             return iframeUrl;
         }
