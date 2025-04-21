@@ -244,24 +244,11 @@ export default /*#__PURE__*/defineComponent({
         }
   },
   mounted() {
-
-        // window.addEventListener("message", this.onMessageEvent, false);
-        // let iframe = this.$refs.iframe;
-        // let self = this;
-        // iframe.onload = function () {
-        //     iframe.contentWindow.postMessage({
-                
-        //     }, "*");
-        //     self.disableImportButton = false;
-        //     self.onReady();
-        // }
-
         if(this.lazy) {
             this.disableImportButton = false;
         } else {
             this.initImporter();
         }
-
     },
   beforeDestroy() {
       window.removeEventListener("message", this.onMessageEvent);
@@ -274,9 +261,7 @@ export default /*#__PURE__*/defineComponent({
         <button :disabled="disableImportButton" @click.prevent="openModal">
             <slot></slot>
         </button>
-        <div ref="holder" class="holder-style">
-            <!-- <iframe ref="iframe" class="iframe" :src="iframeSrc" frameBorder="0"></iframe> -->
-        </div>
+        <div ref="holder" class="holder-style"></div>
     </div>
 </template>
 
