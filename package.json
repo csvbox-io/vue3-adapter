@@ -1,6 +1,6 @@
 {
   "name": "@csvbox/vuejs3",
-  "version": "1.1.8",
+  "version": "1.1.9",
   "description": "Vue adapter (Vue Version 3) for csvbox.io",
   "types": "types/index.d.ts",
   "author": "csvbox-io",
