@@ -1,6 +1,6 @@
 {
   "name": "@csvbox/vuejs3",
-  "version": "1.1.9",
+  "version": "1.1.10",
   "description": "Vue adapter (Vue Version 3) for csvbox.io",
   "types": "types/index.d.ts",
   "author": "csvbox-io",
@@ -29,6 +29,7 @@
   },
 
   "dependencies": {
+    "@csvbox/adapter": "^0.0.1"
   },
 
   "devDependencies": {
@@ -37,6 +38,7 @@
     "@rollup/plugin-alias": "^3.1.2",
     "@rollup/plugin-babel": "^5.3.0",
     "@rollup/plugin-commonjs": "^14.0.0",
+    "@rollup/plugin-json": "^4.1.0",
     "@rollup/plugin-node-resolve": "^9.0.0",
     "@rollup/plugin-replace": "^2.4.2",
     "@vue/cli-plugin-babel": "^4.5.13",
