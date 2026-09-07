@@ -21,6 +21,10 @@ const esbrowserslist = fs.readFileSync('./.browserslistrc')
 const babelPresetEnvConfig = require('../babel.config')
   .presets.filter((entry) => entry[0] === '@babel/preset-env')[0][1];
 
+// Stamped into the iframe URL as `library-version`. Read here at build time so the
+// component never has to require() package.json at runtime.
+const { version: libraryVersion } = require('../package.json');
+
 const argv = minimist(process.argv.slice(2));
 
 const projectRoot = path.resolve(__dirname, '..');
@@ -40,6 +44,7 @@ const baseConfig = {
     ],
     replace: {
       'process.env.NODE_ENV': JSON.stringify('production'),
+      __CSVBOX_LIBRARY_VERSION__: libraryVersion,
     },
     vue: {
     },

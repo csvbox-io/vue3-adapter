@@ -1,7 +1,9 @@
 <script>
 import { defineComponent } from 'vue';
 import { isProxy, toRaw } from 'vue';
-const packageJson = require("./../package.json")
+// Replaced at build time with the version from package.json.
+// See the `replace` config in build/rollup.config.js.
+const LIBRARY_VERSION = "__CSVBOX_LIBRARY_VERSION__";
 
 export default /*#__PURE__*/defineComponent({
   name: 'CSVBoxButton', // vue component name
@@ -81,7 +83,7 @@ export default /*#__PURE__*/defineComponent({
             let domain = this.customDomain ? this.customDomain : "app.csvbox.io";
             if(this.dataLocation) { domain = `${this.dataLocation}-${domain}`; }
             let iframeUrl = `https://${domain}/embed/${this.licenseKey}`;
-            iframeUrl += `?library-version=${packageJson.version}`;
+            iframeUrl += `?library-version=${LIBRARY_VERSION}`;
             iframeUrl += "&framework=vue3";
             if(this.dataLocation) {
                 iframeUrl += "&preventRedirect";
