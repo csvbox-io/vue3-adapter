@@ -79,10 +79,20 @@ export default /*#__PURE__*/defineComponent({
     },
   },
   computed: {
-        iframeSrc() {
+        importerDomain() {
             let domain = this.customDomain ? this.customDomain : "app.csvbox.io";
             if(this.dataLocation) { domain = `${this.dataLocation}-${domain}`; }
-            let iframeUrl = `https://${domain}/embed/${this.licenseKey}`;
+            return domain;
+        },
+        // Only postPendingFile() uses this. The config messages keep their "*" target: narrowing
+        // those would silently drop the handshake for any customDomain that redirects to another
+        // host, and breaking existing importers is not worth it. A file is different — its bytes
+        // are the end user's, so they go to a named origin or nowhere.
+        targetOrigin() {
+            return `https://${this.importerDomain}`;
+        },
+        iframeSrc() {
+            let iframeUrl = `https://${this.importerDomain}/embed/${this.licenseKey}`;
             iframeUrl += `?library-version=${LIBRARY_VERSION}`;
             iframeUrl += "&framework=vue3";
             if(this.dataLocation) {
@@ -111,6 +121,7 @@ export default /*#__PURE__*/defineComponent({
             iframe: null,
             isIframeLoaded: false,
             openModalOnIframeLoad: false,
+            pendingFile: null,
         }
     },
   methods: {
@@ -124,13 +135,70 @@ export default /*#__PURE__*/defineComponent({
             }
             if(!this.isModalShown) {
                 if(this.isIframeLoaded) {
-                    this.isModalShown = true;
-                    this.$refs.holder.style.display = 'block';
-                    this.iframe.contentWindow.postMessage('openModal', '*');
+                    if(this.pendingFile) {
+                        // The importer opens its own modal once it has the file, so that it can
+                        // inject on 'shown.bs.modal'. Sending 'openModal' as well would race that.
+                        //
+                        // It can also decline: wrong step, an import file URL configured on the
+                        // sheet, or an importer too old to know the message at all. So the holder
+                        // goes up click-through and stays that way until 'csvbox-modal-shown'
+                        // confirms the modal is really up. It covers the viewport at z-index
+                        // 2147483647 and the importer renders transparent with its modal closed,
+                        // so arming it on an unanswered message leaves an invisible sheet over the
+                        // host page eating every click.
+                        //
+                        // display:block regardless, so the iframe lays out and animates normally;
+                        // only pointer-events is held back. isModalShown likewise waits for the
+                        // confirmation, or a declined file would latch the importer shut for good.
+                        this.$refs.holder.style.pointerEvents = 'none';
+                        this.$refs.holder.style.display = 'block';
+                        this.postPendingFile();
+                    } else {
+                        this.isModalShown = true;
+                        // Explicit: a previously declined file leaves the holder click-through.
+                        this.$refs.holder.style.pointerEvents = 'auto';
+                        this.$refs.holder.style.display = 'block';
+                        this.iframe.contentWindow.postMessage('openModal', '*');
+                    }
                 } else {
                     this.openModalOnIframeLoad = true;
                 }                    
             }
+        },
+        /**
+         * Open the importer on a File the host page already has, instead of the file picker.
+         *
+         * Reachable through a template ref on the component
+         * (`this.$refs.importer.openModalWithFile(file)`).
+         *
+         * The File crosses to the iframe by structured clone, so the importer receives the real
+         * object and applies its own extension, worksheet and size rules to it — this does not
+         * bypass any of them. Pass a File; a Blob has no name for the importer to read an
+         * extension from.
+         */
+        openModalWithFile(file) {
+            if(!window.File || !(file instanceof window.File)) {
+                return;
+            }
+            this.pendingFile = file;
+
+            // Already open: hand it over now rather than holding it for the next open. The
+            // importer takes it only while it is still on the upload step, and ignores it once
+            // the user has a dataset and a mapping in progress.
+            if(this.isModalShown && this.iframe && this.isIframeLoaded) {
+                this.postPendingFile();
+                return;
+            }
+
+            this.openModal();
+        },
+        postPendingFile() {
+            this.iframe.contentWindow.postMessage({
+                type: 'csvbox-set-file',
+                file: toRaw(this.pendingFile),
+                unique_token: this.uuid
+            }, this.targetOrigin);
+            this.pendingFile = null;
         },
       onMessageEvent(event) {
 
@@ -198,8 +266,26 @@ export default /*#__PURE__*/defineComponent({
                             console.log("onImport", false, event.data.data);
                             this.onImport(false, event.data.data);
                         }
+                    } else if(event.data.type && event.data.type == "csvbox-modal-shown") {
+                        // What the file path in openModal() is waiting for. display as well as
+                        // pointer-events: a second file declined while the first was still opening the
+                        // modal has put the holder away in the meantime.
+                        this.isModalShown = true;
+                        this.$refs.holder.style.display = 'block';
+                        this.$refs.holder.style.pointerEvents = 'auto';
+                    } else if(event.data.type && event.data.type == "csvbox-set-file-rejected") {
+                        // The importer has the file and will not take it. Put the holder away only if the
+                        // modal was never confirmed up: a file declined while it is open (an import past
+                        // the upload step, a fade-out under way) leaves that modal where it is, and its
+                        // own 'csvbox-modal-hidden' will put the holder away when it closes.
+                        if(!this.isModalShown) {
+                            this.$refs.holder.style.display = 'none';
+                            this.$refs.holder.style.pointerEvents = 'auto';
+                        }
+                        console.warn("[csvbox] importer declined the supplied file: " + event.data.data.reason);
                     } else if(event.data.type && event.data.type == "csvbox-modal-hidden") {
                         this.$refs.holder.style.display = 'none';
+                        this.$refs.holder.style.pointerEvents = 'auto';
                         this.isModalShown = false;
                         this.onClose();
                     } else if(event.data.type && event.data.type == "csvbox-upload-successful") {
