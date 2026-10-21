@@ -5,7 +5,8 @@ import {
     generateUuid,
     buildInitPayload,
     createModalLifecycle,
-    classifyStructuredMessage
+    classifyStructuredMessage,
+    classifyLegacyMessage
 } from '@csvbox/adapter';
 // Replaced at build time with the version from package.json.
 // See the `replace` config in build/rollup.config.js.
@@ -258,6 +259,21 @@ export default /*#__PURE__*/defineComponent({
       }
     },
     onMessageEvent(event) {
+      // Older importers send these as bare strings, without a token.
+      const legacy = classifyLegacyMessage(event.data);
+      if (legacy) {
+        if (legacy.type === "mainModalHidden") {
+          this.handleModalClosed();
+        }
+        if (legacy.type === "uploadSuccessful") {
+          this.onImport(true);
+        }
+        if (legacy.type === "uploadFailed") {
+          this.onImport(false);
+        }
+        return;
+      }
+
       // Set-file handshake messages. The shared core does not classify these, so they are
       // read here, behind the same unique_token check the core applies.
       const raw = event.data;
