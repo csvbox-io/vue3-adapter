@@ -29,7 +29,7 @@
   },
 
   "dependencies": {
-    "@csvbox/adapter": "^0.0.1"
+    "@csvbox/adapter": "^0.1.0"
   },
 
   "devDependencies": {

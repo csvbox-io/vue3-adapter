@@ -5,6 +5,7 @@ import {
     generateUuid,
     buildInitPayload,
     createModalLifecycle,
+    createFileSender,
     classifyStructuredMessage,
     classifyLegacyMessage
 } from '@csvbox/adapter';
@@ -170,8 +171,6 @@ export default /*#__PURE__*/defineComponent({
       isModalShown: false,
       isIframeLoaded: false,
       pendingFile: null,
-      importerOrigin: null,
-      probingOrigin: false,
       // True while a different importer on the page is open: the button stays disabled.
       blockedByOther: false
     }
@@ -208,7 +207,7 @@ export default /*#__PURE__*/defineComponent({
         // or a declined file would latch the importer shut for good.
         this.$refs.holder.style.pointerEvents = 'none';
         this.$refs.holder.style.display = 'block';
-        this.postPendingFile();
+        this.fileSender.send();
         return;
       }
 
@@ -241,80 +240,15 @@ export default /*#__PURE__*/defineComponent({
       // importer takes it only while it is still on the upload step, and ignores it once
       // the user has a dataset and a mapping in progress.
       if (this.isModalShown && this.iframe && this.isIframeLoaded) {
-        this.postPendingFile();
+        this.fileSender.send();
         return;
       }
 
       this.openModal();
     },
-    postPendingFile() {
-      if (this.importerOrigin) {
-        this.sendPendingFile(this.importerOrigin);
-        return;
-      }
-
-      // Origin not known yet: send a probe without the file, and send the file to the origin
-      // that replies. If nobody replies in time, use targetOrigin like before.
-      if (this.probingOrigin) {
-        return;
-      }
-      this.probingOrigin = true;
-      this.iframe.contentWindow.postMessage({
-        type: 'csvbox-set-file',
-        unique_token: this.uuid
-      }, '*');
-      this.probeTimer = setTimeout(() => {
-        this.probeTimer = null;
-        this.probingOrigin = false;
-        this.sendPendingFile(this.targetOrigin);
-      }, 1500);
-    },
-    sendPendingFile(origin) {
-      if (!this.pendingFile || !this.iframe) {
-        return;
-      }
-      this.iframe.contentWindow.postMessage({
-        type: 'csvbox-set-file',
-        // toRaw: data() wraps the File in a reactive Proxy, which structured clone rejects.
-        file: toRaw(this.pendingFile),
-        unique_token: this.uuid
-      }, origin);
-      this.pendingFile = null;
-      this.startFileAckTimer();
-    },
-    // Remember the importer's origin, only from our own iframe, with our token, and a csvbox host.
-    learnImporterOrigin(event) {
-      if (this.importerOrigin || !this.iframe || event.source !== this.iframe.contentWindow) {
-        return;
-      }
-      if (!this.isImporterOrigin(event.origin)) {
-        return;
-      }
-      this.importerOrigin = event.origin;
-      if (this.probingOrigin) {
-        this.probingOrigin = false;
-        this.clearProbeTimer();
-        this.sendPendingFile(this.importerOrigin);
-      }
-    },
-    isImporterOrigin(origin) {
-      let url;
-      try {
-        url = new URL(origin);
-      } catch (e) {
-        return false;
-      }
-      if (url.protocol !== 'https:') {
-        return false;
-      }
-      return url.host === this.baseDomain || url.host.endsWith('-' + this.baseDomain);
-    },
     clearProbeTimer() {
       this.clearFileAckTimer();
-      if (this.probeTimer) {
-        clearTimeout(this.probeTimer);
-        this.probeTimer = null;
-      }
+      this.fileSender.reset();
     },
     startFileAckTimer() {
       this.clearFileAckTimer();
@@ -369,7 +303,7 @@ export default /*#__PURE__*/defineComponent({
       // read here, behind the same unique_token check the core applies.
       const raw = event.data;
       if (raw && typeof raw === "object" && raw.data && raw.data.unique_token == this.uuid) {
-        this.learnImporterOrigin(event);
+        this.fileSender.learnOrigin(event);
 
         if (raw.type === "csvbox-set-file-rejected" && raw.data.reason === "not-a-file") {
           // Reply to our probe (it has no file). It only tells us the origin, so do nothing.
@@ -427,8 +361,6 @@ export default /*#__PURE__*/defineComponent({
       }
       this.lifecycle.markClosed();
       // A new iframe is built on the next open, so the origin is learned again.
-      this.importerOrigin = null;
-      this.probingOrigin = false;
       this.clearProbeTimer();
       this.isModalShown = false;
       this.isIframeLoaded = false;
@@ -474,6 +406,18 @@ export default /*#__PURE__*/defineComponent({
   },
   created() {
     this.registryEntry = { getHolder: () => this.$refs.holder };
+    this.fileSender = createFileSender({
+      getIframe: () => this.iframe,
+      getToken: () => this.uuid,
+      getTargetOrigin: () => this.targetOrigin,
+      getBaseDomain: () => this.baseDomain,
+      takeFile: () => {
+        const file = this.pendingFile;
+        this.pendingFile = null;
+        return toRaw(file);
+      },
+      onSent: () => this.startFileAckTimer()
+    });
   },
   mounted() {
     this.syncBlocked();
