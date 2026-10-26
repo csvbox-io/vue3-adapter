@@ -2,7 +2,7 @@
 
 > Vue adapter for csvbox.io
 
-[![NPM](https://img.shields.io/npm/v/@csvbox/vuejs.svg)](https://www.npmjs.com/package/@csvbox/vuejs3) [![JavaScript Style Guide](https://img.shields.io/badge/code_style-standard-brightgreen.svg)](https://standardjs.com)
+[![NPM](https://img.shields.io/npm/v/@csvbox/vuejs3.svg)](https://www.npmjs.com/package/@csvbox/vuejs3) [![JavaScript Style Guide](https://img.shields.io/badge/code_style-standard-brightgreen.svg)](https://standardjs.com)
 
 ## Shell
 
@@ -108,6 +108,10 @@ If the importer does not answer a supplied file within about 8 seconds (for exam
 While an importer is open (or still loading to open), the button of every other CSVBox instance on the page is disabled until it closes, so two importers are not opened by accident. In React, the second argument of the `render` prop (`isLoading`) is also `true` in that state, so a custom trigger can disable itself the same way.
 
 Opening a second importer from code (`openModal()` or `openModalWithFile()`) is still possible. The importer opened last is shown on top of the others, and closing it reveals the one underneath.
+
+## Closing the importer during an import
+
+If your user submits a file and then closes the importer before the import has finished, the import carries on and your `onImport` callback is still called with the result when it completes. The importer is reloaded the next time it is opened.
 
 ## Readme
 
