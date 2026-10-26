@@ -4,7 +4,6 @@ import path from 'path';
 import vue from 'rollup-plugin-vue';
 import alias from '@rollup/plugin-alias';
 import commonjs from '@rollup/plugin-commonjs';
-import json from '@rollup/plugin-json';
 import resolve from '@rollup/plugin-node-resolve';
 import replace from '@rollup/plugin-replace';
 import babel from '@rollup/plugin-babel';
@@ -50,7 +49,6 @@ const baseConfig = {
     vue: {
     },
     postVue: [
-      json(),
       resolve({
         extensions: ['.js', '.jsx', '.ts', '.tsx', '.vue'],
       }),
@@ -66,7 +64,10 @@ const baseConfig = {
       commonjs(),
     ],
     babel: {
-      exclude: 'node_modules/**',
+      // Everything in node_modules is left alone except the CSVBox adapter, which ships as plain
+      // ES2015+ and is bundled into the cjs and iife outputs, so it has to be transpiled with the
+      // rest. (The esm output leaves it external, see below.)
+      exclude: /node_modules\/(?!@csvbox\/adapter\/)/,
       extensions: ['.js', '.jsx', '.ts', '.tsx', '.vue'],
       babelHelpers: 'bundled',
     },
@@ -95,7 +96,10 @@ if (!argv.format || argv.format === 'es') {
   const esConfig = {
     ...baseConfig,
     input: 'src/entry.esm.js',
-    external,
+    // A bundler consuming the esm output gets one copy of the adapter from its own dependency
+    // tree. The cjs and iife outputs have to carry it: the adapter is ESM-only, so require() of
+    // it fails on older Node, and a <script> tag has no module system.
+    external: [...external, '@csvbox/adapter'],
     output: {
       file: 'dist/vue-adapter-v3.esm.js',
       format: 'esm',
