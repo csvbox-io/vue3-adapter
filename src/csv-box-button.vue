@@ -135,6 +135,7 @@ export default /*#__PURE__*/defineComponent({
       // Counts as open from the moment it is requested, so the other buttons are disabled while
       // this importer is still loading, and so it is stacked above any importer opened earlier.
       registerOpenImporter(this.registryEntry);
+      this.closeReported = false;
       if (!this.iframe) {
         this.lifecycle.requestOpen();
         this.initImporter();
@@ -168,6 +169,7 @@ export default /*#__PURE__*/defineComponent({
 
       if (this.lifecycle.requestOpen()) {
         this.isModalShown = true;
+        this.closeReported = false;
         // Explicit: a previously declined file leaves the holder click-through.
         this.$refs.holder.style.pointerEvents = 'auto';
         this.$refs.holder.style.display = 'block';
@@ -316,6 +318,11 @@ export default /*#__PURE__*/defineComponent({
       this.finishImport(ended);
     },
     handleModalClosed() {
+      // A repeated close message must not call onClose a second time. The flag is cleared when the importer is opened again.
+      if (this.closeReported) {
+        return;
+      }
+      this.closeReported = true;
       if (this.importTracker.isInFlight()) {
         // Closed after submitting and before the result arrived: keep the iframe and its listener
         // so the late result still reaches onImport. It is removed once that result has been
@@ -365,6 +372,7 @@ export default /*#__PURE__*/defineComponent({
       this.uuid = generateUuid();
       this.messageGate.reset();
       this.importTracker.reset();
+      this.closeReported = false;
       this.loadStarted();
 
       const iframe = document.createElement("iframe");
@@ -399,6 +407,7 @@ export default /*#__PURE__*/defineComponent({
   created() {
     // Plain properties, not data(): they hold no template state and must not be made reactive.
     this.messageGate = createMessageGate();
+    this.closeReported = false;
     this.importTracker = createImportTracker();
     this.registryEntry = { getHolder: () => this.$refs.holder };
     this.fileSender = createFileSender({
