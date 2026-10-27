@@ -13,7 +13,8 @@ import {
     registerOpenImporter,
     unregisterOpenImporter,
     isBlockedByOpenImporter,
-    subscribeOpenImporters
+    subscribeOpenImporters,
+    HOLDER_STYLE
 } from '@csvbox/adapter';
 // Replaced at build time with the version from package.json.
 // See the `replace` config in build/rollup.config.js.
@@ -93,6 +94,11 @@ export default /*#__PURE__*/defineComponent({
     }
   },
   computed: {
+    // Inline, so the hidden layer is hidden in server-rendered HTML too. One cached object: Vue re-applies a style
+    // object only when it changes, so a later render does not undo the display the code sets on open and close.
+    holderStyle() {
+      return { ...HOLDER_STYLE };
+    },
     iframeSrc() {
       return buildImportUrl(
         {
@@ -464,21 +470,10 @@ export default /*#__PURE__*/defineComponent({
         <button :disabled="disableImportButton || blockedByOther" @click.prevent="openModal">
             <slot></slot>
         </button>
-        <div ref="holder" class="holder-style"></div>
+        <div ref="holder" :style="holderStyle"></div>
     </div>
 </template>
 
-<style scoped>
-    .holder-style {
-        display: none;
-        z-index: 2147483647;
-        position: fixed;
-        top: 0;
-        bottom: 0;
-        left: 0;
-        right: 0;
-    }
-</style>
 <style>
 .csvbox-iframe {
     height: 100%;
