@@ -249,6 +249,8 @@ export default /*#__PURE__*/defineComponent({
           return;
         }
         const ended = this.importTracker.observe(legacy);
+        // Clean up before the callbacks run: a callback that throws must not leave a closed import behind.
+        this.finishImport(ended);
         if (legacy.type === "mainModalHidden") {
           this.handleModalClosed();
         }
@@ -258,7 +260,6 @@ export default /*#__PURE__*/defineComponent({
         if (legacy.type === "uploadFailed") {
           this.onImport(false);
         }
-        this.finishImport(ended);
         return;
       }
 
@@ -303,6 +304,7 @@ export default /*#__PURE__*/defineComponent({
       }
       this.messageGate.markTyped();
       const ended = this.importTracker.observe(message);
+      this.finishImport(ended);
 
       if (message.type === "data-on-submit") {
         this.onSubmit?.(message.metadata);
@@ -315,7 +317,6 @@ export default /*#__PURE__*/defineComponent({
       } else if (message.type === "csvbox-upload-failed") {
         this.onImport(false);
       }
-      this.finishImport(ended);
     },
     handleModalClosed() {
       // A repeated close message must not call onClose a second time. The flag is cleared when the importer is opened again.
@@ -395,9 +396,15 @@ export default /*#__PURE__*/defineComponent({
 
         iframe.contentWindow.postMessage(buildInitPayload(user, dynamicColumns, options, this.uuid), "*");
         this.disableImportButton = false;
-        this.onReady();
-        if (this.lifecycle.markReady()) {
-            this.openModal();
+        // The importer is ready whatever the callback does: if onReady throws, an open that was waiting
+        // for the iframe must still go ahead.
+        const openWhenReady = this.lifecycle.markReady();
+        try {
+            this.onReady();
+        } finally {
+            if (openWhenReady) {
+                this.openModal();
+            }
         }
       };
 
